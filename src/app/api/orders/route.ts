@@ -234,7 +234,6 @@ export async function POST(request: Request) {
     }
 
     const itemIds = body.items.map((item) => item.id);
-
     const uniqueItemIds = new Set(itemIds);
 
     if (uniqueItemIds.size !== itemIds.length) {
@@ -417,6 +416,18 @@ export async function POST(request: Request) {
                 quantity: {
                   gte: item.quantity,
                 },
+                OR: [
+                  {
+                    reserved: 0,
+                  },
+                  {
+                    reserved: {
+                      lte:
+                        item.product.stock!.quantity -
+                        item.quantity,
+                    },
+                  },
+                ],
               },
               data: {
                 reserved: {
@@ -433,6 +444,11 @@ export async function POST(request: Request) {
         }
 
         return createdOrder;
+      },
+      {
+        isolationLevel: "Serializable",
+        maxWait: 5000,
+        timeout: 10000,
       },
     );
 
