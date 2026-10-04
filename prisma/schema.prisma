@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// USERS / CUSTOMERS
+// ─────────────────────────────────────────────
+
+model User {
+  id           Int       @id @default(autoincrement())
+  phone        String    @unique
+  email        String?   @unique
+  passwordHash String?
+  firstName    String?
+  lastName     String?
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customer     Customer?
+  addresses    Address[]
+  favorites    Favorite[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  firstName String
+  lastName  String
+  phone     String
+  email     String?
+  userId    Int?      @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User?     @relation(fields: [userId], references: [id])
+  orders    Order[]
+
+  @@index([phone])
+  @@index([email])
+}
+
+// ─────────────────────────────────────────────
+// ADDRESSES
+// ─────────────────────────────────────────────
+
+model Address {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  title        String?
+  recipientName String
+  phone        String
+  city         String
+  postalCode   String?
+  street       String
+  house        String
+  apartment    String?
+  entrance     String?
+  floor        String?
+  comment      String?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders       Order[]
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// CATEGORIES
+// ─────────────────────────────────────────────
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+// ─────────────────────────────────────────────
+// PRODUCTS
+// ─────────────────────────────────────────────
+
+model Product {
+  id             Int       @id @default(autoincrement())
+  slug           String    @unique
+  brand          String
+  name           String
+  description    String
+  price          Int
+  oldPrice       Int?
+  badge          String?
+  rating         Float     @default(0)
+  reviews        Int       @default(0)
+  quantity       String
+  sku            String?   @unique
+  barcode        String?   @unique
+  isActive       Boolean   @default(true)
+  isFeatured     Boolean   @default(false)
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  categoryId     Int
+  category       Category  @relation(fields: [categoryId], references: [id])
+
+  images         ProductImage[]
+  stock          ProductStock?
+  orderItems     OrderItem[]
+  favorites      Favorite[]
+  reviewsData    Review[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([brand])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// PRODUCT IMAGES
+// ─────────────────────────────────────────────
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([sortOrder])
+}
+
+// ─────────────────────────────────────────────
+// PRODUCT STOCK
+// ─────────────────────────────────────────────
+
+model ProductStock {
+  id           Int      @id @default(autoincrement())
+  productId    Int      @unique
+  quantity     Int      @default(0)
+  reserved     Int      @default(0)
+  lowStockAt   Int      @default(5)
+  updatedAt    DateTime @updatedAt
+
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([quantity])
+}
+
+// ─────────────────────────────────────────────
+// FAVORITES
+// ─────────────────────────────────────────────
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────
+// ORDERS
+// ─────────────────────────────────────────────
+
+model Order {
+  id              Int          @id @default(autoincrement())
+  number          String       @unique
+  status          OrderStatus  @default(NEW)
+
+  deliveryMethod  DeliveryMethod
+  paymentMethod   PaymentMethod
+
+  totalItems      Int
+  subtotal        Int
+  discount        Int          @default(0)
+  deliveryPrice   Int          @default(0)
+  totalPrice      Int
+
+  customerId      Int
+  addressId       Int?
+
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  address         Address?     @relation(fields: [addressId], references: [id])
+
+  recipientName   String
+  recipientPhone  String
+  deliveryAddress String?
+
+  comment         String?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  items           OrderItem[]
+  payments        Payment[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerId])
+  @@index([addressId])
+}
+
+// ─────────────────────────────────────────────
+// ORDER ITEMS
+// ─────────────────────────────────────────────
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  productId Int
+
+  name      String
+  brand     String
+  sku       String?
+
+  price     Int
+  quantity  Int
+  total     Int
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────
+// PAYMENTS / YOOKASSA
+// ─────────────────────────────────────────────
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+
+  orderId         Int
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider        PaymentProvider @default(YOOKASSA)
+  status          PaymentStatus @default(PENDING)
+
+  amount          Int
+
+  externalId      String?       @unique
+  idempotenceKey  String?       @unique
+
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([externalId])
+}
+
+// ─────────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────────
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  productId Int
+
+  authorName String
+  rating     Int
+  text       String?
+
+  isPublished Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([isPublished])
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  MANAGER
+}
+
+enum OrderStatus {
+  NEW
+  AWAITING_PAYMENT
+  PAID
+  ASSEMBLING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryMethod {
+  COURIER
+  PICKUP
+  POST
+  CDEK
+}
+
+enum PaymentMethod {
+  CARD
+  SBP
+  CASH
+}
+
+enum PaymentProvider {
+  YOOKASSA
+}
+
+enum PaymentStatus {
+  PENDING
+  WAITING_FOR_CAPTURE
+  SUCCEEDED
+  CANCELED
+  REFUNDED
+  FAILED
+}
