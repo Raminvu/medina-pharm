@@ -13,33 +13,16 @@ import {
 
 import { useCartStore } from "@/store/cart-store";
 
-type DeliveryMethod =
-  | "pickup"
-  | "russian-post"
-  | "ozon"
-  | "cdek"
-  | "minibus";
+type DeliveryMethod = "pickup" | "russian-post";
 
 type FormData = {
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
-
   postCity: string;
   postIndex: string;
   postAddress: string;
-
-  ozonCity: string;
-  ozonPickup: string;
-
-  cdekCity: string;
-  cdekPickup: string;
-
-  minibusCity: string;
-  minibusStation: string;
-  minibusContact: string;
-
   comment: string;
 };
 
@@ -60,21 +43,6 @@ const deliveryMethods: {
     title: "Почта России",
     description: "Доставка в отделение или по адресу",
   },
-  {
-    id: "ozon",
-    title: "Ozon Доставка",
-    description: "Получение в пункте Ozon",
-  },
-  {
-    id: "cdek",
-    title: "СДЕК",
-    description: "Получение в пункте СДЕК",
-  },
-  {
-    id: "minibus",
-    title: "Через маршрутку",
-    description: "Передача заказа междугородней маршруткой",
-  },
 ];
 
 const initialForm: FormData = {
@@ -82,21 +50,9 @@ const initialForm: FormData = {
   lastName: "",
   phone: "",
   email: "",
-
   postCity: "",
   postIndex: "",
   postAddress: "",
-
-  ozonCity: "",
-  ozonPickup: "",
-
-  cdekCity: "",
-  cdekPickup: "",
-
-  minibusCity: "",
-  minibusStation: "",
-  minibusContact: "",
-
   comment: "",
 };
 
@@ -107,10 +63,12 @@ export default function CheckoutPage() {
     useState<DeliveryMethod>("pickup");
 
   const [form, setForm] = useState<FormData>(initialForm);
-
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdOrderNumber, setCreatedOrderNumber] = useState<string | null>(
+    null,
+  );
 
   const totalItems = items.reduce(
     (sum, item) => sum + item.count,
@@ -138,11 +96,11 @@ export default function CheckoutPage() {
 
       const next = { ...current };
       delete next[field];
-
       return next;
     });
 
     setSubmitted(false);
+    setCreatedOrderNumber(null);
   };
 
   const changeDeliveryMethod = (
@@ -151,6 +109,7 @@ export default function CheckoutPage() {
     setDeliveryMethod(method);
     setErrors({});
     setSubmitted(false);
+    setCreatedOrderNumber(null);
   };
 
   const validateForm = (): FormErrors => {
@@ -169,8 +128,7 @@ export default function CheckoutPage() {
     } else if (
       form.phone.replace(/\D/g, "").length < 10
     ) {
-      nextErrors.phone =
-        "Введите корректный номер телефона";
+      nextErrors.phone = "Введите корректный номер телефона";
     }
 
     if (!form.email.trim()) {
@@ -180,8 +138,7 @@ export default function CheckoutPage() {
         form.email.trim(),
       )
     ) {
-      nextErrors.email =
-        "Введите корректный email";
+      nextErrors.email = "Введите корректный email";
     }
 
     if (deliveryMethod === "russian-post") {
@@ -190,8 +147,7 @@ export default function CheckoutPage() {
       }
 
       if (!form.postIndex.trim()) {
-        nextErrors.postIndex =
-          "Введите почтовый индекс";
+        nextErrors.postIndex = "Введите почтовый индекс";
       } else if (!/^\d{6}$/.test(form.postIndex.trim())) {
         nextErrors.postIndex =
           "Индекс должен содержать 6 цифр";
@@ -200,51 +156,6 @@ export default function CheckoutPage() {
       if (!form.postAddress.trim()) {
         nextErrors.postAddress =
           "Введите адрес или номер отделения";
-      }
-    }
-
-    if (deliveryMethod === "ozon") {
-      if (!form.ozonCity.trim()) {
-        nextErrors.ozonCity = "Введите город";
-      }
-
-      if (!form.ozonPickup.trim()) {
-        nextErrors.ozonPickup =
-          "Укажите пункт выдачи Ozon";
-      }
-    }
-
-    if (deliveryMethod === "cdek") {
-      if (!form.cdekCity.trim()) {
-        nextErrors.cdekCity = "Введите город";
-      }
-
-      if (!form.cdekPickup.trim()) {
-        nextErrors.cdekPickup =
-          "Укажите пункт выдачи СДЕК";
-      }
-    }
-
-    if (deliveryMethod === "minibus") {
-      if (!form.minibusCity.trim()) {
-        nextErrors.minibusCity =
-          "Введите город назначения";
-      }
-
-      if (!form.minibusStation.trim()) {
-        nextErrors.minibusStation =
-          "Укажите место передачи";
-      }
-
-      if (!form.minibusContact.trim()) {
-        nextErrors.minibusContact =
-          "Введите контактный телефон";
-      } else if (
-        form.minibusContact.replace(/\D/g, "").length <
-        10
-      ) {
-        nextErrors.minibusContact =
-          "Введите корректный номер телефона";
       }
     }
 
@@ -285,6 +196,7 @@ export default function CheckoutPage() {
 
     setErrors({});
     setSubmitted(false);
+    setCreatedOrderNumber(null);
     setIsSubmitting(true);
 
     try {
@@ -299,7 +211,25 @@ export default function CheckoutPage() {
             count: item.count,
           })),
           deliveryMethod,
-          form,
+          form: {
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+            phone: form.phone.trim(),
+            email: form.email.trim(),
+            postCity:
+              deliveryMethod === "russian-post"
+                ? form.postCity.trim()
+                : "",
+            postIndex:
+              deliveryMethod === "russian-post"
+                ? form.postIndex.trim()
+                : "",
+            postAddress:
+              deliveryMethod === "russian-post"
+                ? form.postAddress.trim()
+                : "",
+            comment: form.comment.trim(),
+          },
         }),
       });
 
@@ -307,8 +237,7 @@ export default function CheckoutPage() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message ||
-            "Не удалось создать заказ.",
+          data.message || "Не удалось создать заказ.",
         );
       }
 
@@ -317,6 +246,9 @@ export default function CheckoutPage() {
         data.order,
       );
 
+      setCreatedOrderNumber(
+        data.order?.number ?? null,
+      );
       setSubmitted(true);
     } catch (error) {
       console.error(
@@ -399,6 +331,7 @@ export default function CheckoutPage() {
                   <h2 className="text-lg font-semibold">
                     Данные покупателя
                   </h2>
+
                   <p className="text-sm text-muted-foreground">
                     Укажите ваши контактные данные
                   </p>
@@ -460,6 +393,7 @@ export default function CheckoutPage() {
                   <h2 className="text-lg font-semibold">
                     Способ доставки
                   </h2>
+
                   <p className="text-sm text-muted-foreground">
                     Выберите удобный способ получения
                   </p>
@@ -550,7 +484,9 @@ export default function CheckoutPage() {
                       onChange={(value) =>
                         updateField(
                           "postIndex",
-                          value.replace(/\D/g, "").slice(0, 6),
+                          value
+                            .replace(/\D/g, "")
+                            .slice(0, 6),
                         )
                       }
                       error={errors.postIndex}
@@ -570,106 +506,6 @@ export default function CheckoutPage() {
                         }
                         error={errors.postAddress}
                         placeholder="Улица, дом, квартира или № отделения"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {deliveryMethod === "ozon" && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Город"
-                      value={form.ozonCity}
-                      onChange={(value) =>
-                        updateField("ozonCity", value)
-                      }
-                      error={errors.ozonCity}
-                      placeholder="Например, Москва"
-                    />
-
-                    <FormInput
-                      label="Пункт выдачи Ozon"
-                      value={form.ozonPickup}
-                      onChange={(value) =>
-                        updateField(
-                          "ozonPickup",
-                          value,
-                        )
-                      }
-                      error={errors.ozonPickup}
-                      placeholder="Адрес или номер пункта"
-                    />
-                  </div>
-                )}
-
-                {deliveryMethod === "cdek" && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Город"
-                      value={form.cdekCity}
-                      onChange={(value) =>
-                        updateField("cdekCity", value)
-                      }
-                      error={errors.cdekCity}
-                      placeholder="Например, Москва"
-                    />
-
-                    <FormInput
-                      label="Пункт выдачи СДЕК"
-                      value={form.cdekPickup}
-                      onChange={(value) =>
-                        updateField(
-                          "cdekPickup",
-                          value,
-                        )
-                      }
-                      error={errors.cdekPickup}
-                      placeholder="Адрес или номер пункта"
-                    />
-                  </div>
-                )}
-
-                {deliveryMethod === "minibus" && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Город назначения"
-                      value={form.minibusCity}
-                      onChange={(value) =>
-                        updateField(
-                          "minibusCity",
-                          value,
-                        )
-                      }
-                      error={errors.minibusCity}
-                      placeholder="Например, Махачкала"
-                    />
-
-                    <FormInput
-                      label="Автостанция / место передачи"
-                      value={form.minibusStation}
-                      onChange={(value) =>
-                        updateField(
-                          "minibusStation",
-                          value,
-                        )
-                      }
-                      error={errors.minibusStation}
-                      placeholder="Например, автостанция"
-                    />
-
-                    <div className="sm:col-span-2">
-                      <FormInput
-                        label="Телефон получателя"
-                        type="tel"
-                        value={form.minibusContact}
-                        onChange={(value) =>
-                          updateField(
-                            "minibusContact",
-                            value,
-                          )
-                        }
-                        error={errors.minibusContact}
-                        placeholder="+7 900 000-00-00"
                       />
                     </div>
                   </div>
@@ -729,10 +565,7 @@ export default function CheckoutPage() {
 
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.count} ×{" "}
-                      {item.price.toLocaleString(
-                        "ru-RU",
-                      )}{" "}
-                      ₽
+                      {item.price.toLocaleString("ru-RU")} ₽
                     </p>
                   </div>
 
@@ -796,10 +629,17 @@ export default function CheckoutPage() {
                       Заказ создан
                     </p>
 
+                    {createdOrderNumber && (
+                      <p className="mt-1 text-xs font-medium">
+                        Номер заказа:{" "}
+                        {createdOrderNumber}
+                      </p>
+                    )}
+
                     <p className="mt-1 text-xs leading-relaxed text-green-700">
-                      Заказ успешно передан на
-                      сервер. Следующим этапом
-                      подключим оплату через ЮKassa.
+                      Заказ успешно сохранён.
+                      Оплату через ЮKassa подключим
+                      следующим этапом.
                     </p>
                   </div>
                 </div>
@@ -815,7 +655,7 @@ export default function CheckoutPage() {
                 ? "Создаём заказ..."
                 : submitted
                   ? "Заказ создан"
-                  : "Перейти к оплате"}
+                  : "Оформить заказ"}
             </button>
 
             <Link
@@ -828,8 +668,8 @@ export default function CheckoutPage() {
 
             <div className="mt-5 rounded-xl bg-muted/40 p-3">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                После создания заказа мы перейдём к
-                безопасной оплате. Данные банковской
+                После создания заказа данные будут
+                сохранены на сервере. Данные банковской
                 карты не хранятся на сайте Medina Pharm.
               </p>
             </div>

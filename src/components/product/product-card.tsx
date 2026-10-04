@@ -12,14 +12,13 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { products } from "@/data/products";
 import { useCartStore } from "@/store/cart-store";
 import { useFavoritesStore } from "@/store/favorites-store";
 
 type ProductBadge = "Хит" | "Новинка" | "Популярное" | "";
 
 type ProductCardProps = {
-  id?: number;
+  id: number;
   slug: string;
   brand: string;
   name: string;
@@ -71,15 +70,7 @@ export default function ProductCard({
     (state) => state.favoriteIds,
   );
 
-  const product = products.find(
-    (item) => item.slug === slug,
-  );
-
-  const favoriteId = id ?? product?.id;
-
-  const isFavorite =
-    favoriteId !== undefined &&
-    favoriteIds.includes(favoriteId);
+  const isFavorite = favoriteIds.includes(id);
 
   const BadgeIcon = badge ? badgeConfig[badge].icon : null;
 
@@ -89,26 +80,8 @@ export default function ProductCard({
     event.preventDefault();
     event.stopPropagation();
 
-    if (!product && id === undefined) {
-      console.error(
-        "Medina Pharm: товар не найден:",
-        slug,
-      );
-      return;
-    }
-
-    const productId = id ?? product?.id;
-
-    if (productId === undefined) {
-      console.error(
-        "Medina Pharm: у товара отсутствует id:",
-        slug,
-      );
-      return;
-    }
-
     addItem({
-      id: productId,
+      id,
       slug,
       brand,
       name,
@@ -131,15 +104,7 @@ export default function ProductCard({
     event.preventDefault();
     event.stopPropagation();
 
-    if (favoriteId === undefined) {
-      console.error(
-        "Medina Pharm: у товара отсутствует id:",
-        slug,
-      );
-      return;
-    }
-
-    toggleFavorite(favoriteId);
+    toggleFavorite(id);
   };
 
   return (
@@ -222,7 +187,7 @@ export default function ProductCard({
                 {price.toLocaleString("ru-RU")} ₽
               </span>
 
-              {oldPrice && (
+              {oldPrice !== undefined && (
                 <span className="text-xs text-muted-foreground line-through">
                   {oldPrice.toLocaleString("ru-RU")} ₽
                 </span>

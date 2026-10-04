@@ -10,7 +10,7 @@ import {
   Star,
 } from "lucide-react";
 
-import { products } from "@/data/products";
+import { prisma } from "@/lib/prisma";
 
 type ProductPageProps = {
   params: Promise<{
@@ -23,13 +23,42 @@ export default async function ProductPage({
 }: ProductPageProps) {
   const { slug } = await params;
 
-  const product = products.find(
-    (item) => item.slug === slug,
-  );
+  const product = await prisma.product.findFirst({
+    where: {
+      slug,
+      isActive: true,
+    },
+    include: {
+      category: true,
+      images: {
+        where: {
+          isPrimary: true,
+        },
+        orderBy: {
+          sortOrder: "asc",
+        },
+        take: 1,
+      },
+      stock: true,
+    },
+  });
 
   if (!product) {
     notFound();
   }
+
+  const image =
+    product.images[0]?.url ?? "/products/placeholder.webp";
+
+  const price = product.price / 100;
+  const oldPrice =
+    product.oldPrice !== null
+      ? product.oldPrice / 100
+      : null;
+
+  const stock = product.stock?.quantity ?? 0;
+
+  const isInStock = stock > 0;
 
   return (
     <main className="bg-background">
@@ -85,7 +114,7 @@ export default async function ProductPage({
               </button>
 
               <Image
-                src={product.image}
+                src={image}
                 alt={product.name}
                 width={600}
                 height={600}
@@ -113,7 +142,7 @@ export default async function ProductPage({
                 <Star className="size-4 fill-current text-amber-400" />
 
                 <span className="text-sm font-semibold">
-                  {product.rating}
+                  {product.rating.toFixed(1)}
                 </span>
               </div>
 
@@ -140,25 +169,36 @@ export default async function ProductPage({
 
             <div className="flex items-end gap-3">
               <span className="text-3xl font-bold tracking-tight">
-                {product.price.toLocaleString("ru-RU")} ₽
+                {price.toLocaleString("ru-RU")} ₽
               </span>
 
-              {product.oldPrice && (
+              {oldPrice !== null && (
                 <span className="pb-1 text-base text-muted-foreground line-through">
-                  {product.oldPrice.toLocaleString("ru-RU")} ₽
+                  {oldPrice.toLocaleString("ru-RU")} ₽
                 </span>
               )}
             </div>
 
-            {product.oldPrice && (
+            {oldPrice !== null && oldPrice > price && (
               <p className="mt-1 text-xs font-medium text-primary">
                 Экономия{" "}
-                {(
-                  product.oldPrice - product.price
-                ).toLocaleString("ru-RU")}{" "}
-                ₽
+                {(oldPrice - price).toLocaleString("ru-RU")} ₽
               </p>
             )}
+
+            {/* Stock */}
+
+            <div className="mt-3">
+              {isInStock ? (
+                <p className="text-sm font-medium text-green-600">
+                  В наличии: {stock} шт.
+                </p>
+              ) : (
+                <p className="text-sm font-medium text-destructive">
+                  Нет в наличии
+                </p>
+              )}
+            </div>
 
             {/* Quantity + cart */}
 
@@ -167,7 +207,8 @@ export default async function ProductPage({
                 <button
                   type="button"
                   aria-label="Уменьшить количество"
-                  className="flex size-11 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                  disabled
+                  className="flex size-11 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Minus className="size-4" />
                 </button>
@@ -179,7 +220,8 @@ export default async function ProductPage({
                 <button
                   type="button"
                   aria-label="Увеличить количество"
-                  className="flex size-11 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                  disabled
+                  className="flex size-11 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="size-4" />
                 </button>
@@ -187,10 +229,14 @@ export default async function ProductPage({
 
               <button
                 type="button"
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                disabled={!isInStock}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ShoppingCart className="size-5" />
-                В корзину
+
+                {isInStock
+                  ? "В корзину"
+                  : "Нет в наличии"}
               </button>
 
               <button
@@ -225,12 +271,15 @@ export default async function ProductPage({
                     Категория
                   </span>
 
-                  <span className="font-medium">
-                    {product.category}
-                  </span>
+                  <Link
+                    href={`/catalog?category=${product.category.slug}`}
+                    className="font-medium transition-colors hover:text-primary"
+                  >
+                    {product.category.name}
+                  </Link>
                 </div>
 
-                <div className="flex items-center justify-between px-4 py-3 text-sm">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm">
                   <span className="text-muted-foreground">
                     Количество
                   </span>
@@ -239,23 +288,20 @@ export default async function ProductPage({
                     {product.quantity}
                   </span>
                 </div>
+
+                {product.sku && (
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-muted-foreground">
+                      Артикул
+                    </span>
+
+                    <span className="font-medium">
+                      {product.sku}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Tags */}
-
-            {product.tags.length > 0 && (
-              <div className="mt-5 flex flex-wrap gap-2">
-                {product.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -269,11 +315,7 @@ export default async function ProductPage({
               </h2>
 
               <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
-                {product.description}. Информация о
-                составе, способе применения и других
-                характеристиках товара будет размещена
-                здесь после подключения полноценной базы
-                товаров.
+                {product.description}
               </p>
             </div>
 
@@ -283,9 +325,8 @@ export default async function ProductPage({
               </p>
 
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Перед применением ознакомьтесь с
-                информацией на упаковке и рекомендациями
-                производителя.
+                Перед применением ознакомьтесь с информацией
+                на упаковке и рекомендациями производителя.
               </p>
             </div>
           </div>
